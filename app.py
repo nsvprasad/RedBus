@@ -173,6 +173,9 @@ def bot_respond(user_input, history):
     Yields:
         tuple: (cleared_input, updated_history)
     """
+    if history is None:
+        history = create_initial_history()
+
     if not user_input or not user_input.strip():
         yield "", history
         return
@@ -180,7 +183,7 @@ def bot_respond(user_input, history):
     user_msg = user_input.strip()
 
     # Append user message
-    new_history = list(history) if history else []
+    new_history = list(history)
     new_history.append({"role": "user", "content": user_msg})
 
     # Prepare placeholder for bot response
@@ -199,18 +202,27 @@ def bot_respond(user_input, history):
         yield "", new_history
 
 
-def apply_suggestion(suggestion_text, history):
-    """
-    Directly execute a quick suggestion button click and stream the bot response.
-    
-    Args:
-        suggestion_text (str): Clicked prompt text.
-        history (list): Current conversation history.
-        
-    Yields:
-        tuple: (cleared_input, updated_history)
-    """
-    yield from bot_respond(suggestion_text, history)
+# Explicit generator functions for Quick Suggestions
+# Using named generator functions allows Gradio's inspect.isgeneratorfunction() to correctly
+# identify them as generators, avoiding the ValueError that occurs when using inline lambdas.
+def select_chennai_bangalore(history):
+    """Handler for 'Chennai to Bangalore' quick suggestion."""
+    yield from bot_respond("Chennai to Bangalore", history)
+
+
+def select_vijayawada_hyderabad(history):
+    """Handler for 'Vijayawada to Hyderabad' quick suggestion."""
+    yield from bot_respond("Vijayawada to Hyderabad", history)
+
+
+def select_budget_buses(history):
+    """Handler for 'Find buses under ₹1000' quick suggestion."""
+    yield from bot_respond("Find buses under ₹1000", history)
+
+
+def select_ac_sleeper(history):
+    """Handler for 'AC Sleeper Buses' quick suggestion."""
+    yield from bot_respond("AC Sleeper Buses", history)
 
 
 def clear_conversation():
@@ -314,30 +326,30 @@ def build_app():
             show_progress=False
         )
 
-        # Quick Suggestion Button Clicks (Directly submits to chatbot)
+        # Quick Suggestion Button Clicks (Using named generator handlers)
         btn_suggest_1.click(
-            fn=lambda h: apply_suggestion("Chennai to Bangalore", h),
+            fn=select_chennai_bangalore,
             inputs=[chatbot],
             outputs=[user_msg_input, chatbot],
             show_progress="minimal"
         )
 
         btn_suggest_2.click(
-            fn=lambda h: apply_suggestion("Vijayawada to Hyderabad", h),
+            fn=select_vijayawada_hyderabad,
             inputs=[chatbot],
             outputs=[user_msg_input, chatbot],
             show_progress="minimal"
         )
 
         btn_suggest_3.click(
-            fn=lambda h: apply_suggestion("Find buses under ₹1000", h),
+            fn=select_budget_buses,
             inputs=[chatbot],
             outputs=[user_msg_input, chatbot],
             show_progress="minimal"
         )
 
         btn_suggest_4.click(
-            fn=lambda h: apply_suggestion("AC Sleeper Buses", h),
+            fn=select_ac_sleeper,
             inputs=[chatbot],
             outputs=[user_msg_input, chatbot],
             show_progress="minimal"
@@ -353,5 +365,6 @@ if __name__ == "__main__":
         server_name="127.0.0.1",
         server_port=7860,
         theme=gr.themes.Default(primary_hue="red"),
-        share=False
+        share=False,
+        show_error=True
     )
