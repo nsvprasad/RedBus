@@ -25,6 +25,11 @@ from modules.browser_automation import (
     format_bus_results,
     BusSearchResult,
 )
+from modules.demo_data import (
+    get_demo_buses,
+    format_demo_bus_results,
+    DEMO_DATA_LABEL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +45,34 @@ GREETING_REGEX = re.compile(
     re.IGNORECASE,
 )
 
+# Regex recognizing user intent to switch to / view demonstration mode
+DEMO_COMMAND_REGEX = re.compile(
+    r"^(?:(?:show|view|try|enable|switch\s+to|use)\s+)?demo(?:\s+mode|\s+data|\s+buses)?(?:[!\.\?]*)$",
+    re.IGNORECASE,
+)
+
+# Regex recognizing user intent to exit demonstration mode and return to live search
+LIVE_MODE_COMMAND_REGEX = re.compile(
+    r"^(?:(?:exit|leave|disable)\s+demo|live(?:\s+mode)?)[!\.\?]*$",
+    re.IGNORECASE,
+)
+
 # Active conversation state (session memory)
 _active_booking: Optional[BookingDetails] = None
+_demo_mode_active: bool = False
+
+
+def is_demo_mode_active() -> bool:
+    """Return whether demonstration mode is currently enabled."""
+    global _demo_mode_active
+    return _demo_mode_active
+
+
+def set_demo_mode(enabled: bool) -> None:
+    """Enable or disable demonstration mode."""
+    global _demo_mode_active
+    _demo_mode_active = enabled
+    logger.info("Demonstration mode set to %s.", enabled)
 
 
 def get_active_booking_details() -> Optional[BookingDetails]:
@@ -51,10 +82,11 @@ def get_active_booking_details() -> Optional[BookingDetails]:
 
 
 def reset_conversation_state() -> None:
-    """Reset the multi-turn conversational booking memory."""
-    global _active_booking
+    """Reset the multi-turn conversational booking memory and demo mode state."""
+    global _active_booking, _demo_mode_active
     _active_booking = None
-    logger.info("Conversational booking state reset.")
+    _demo_mode_active = False
+    logger.info("Conversational booking state and demo mode reset.")
 
 
 def clear_conversation() -> None:
@@ -154,6 +186,41 @@ def get_bot_response(user_message: str) -> str:
             "You can specify your route (e.g., *'Chennai to Bangalore tomorrow'*)."
         )
 
+    # 2b. Exit demo mode command
+    if LIVE_MODE_COMMAND_REGEX.match(msg):
+        set_demo_mode(False)
+        return "Switched back to Live Search mode! Where would you like to travel today?"
+
+    # 2c. Switch to / trigger Demo Mode command
+    if DEMO_COMMAND_REGEX.match(msg):
+        set_demo_mode(True)
+        if _active_booking and _active_booking.source and _active_booking.destination and _active_booking.journey_date:
+            summary_md = format_booking_summary(_active_booking)
+            demo_result = get_demo_buses(
+                source=_active_booking.source,
+                destination=_active_booking.destination,
+                journey_date=_active_booking.journey_date,
+                details=_active_booking,
+            )
+            demo_md = format_demo_bus_results(demo_result)
+            safety_notice = (
+                "\n\n*🔒 RedBus AI Assistant operates in Demonstration & Planning mode. "
+                "Review options above and complete actual bookings directly on redBus.in.*"
+            )
+            return summary_md + demo_md + safety_notice
+        else:
+            return (
+                "🎭 **Demonstration Mode Enabled!**\n\n"
+                "Live search on redBus.in is currently restricted by automated access protections. "
+                "In Demo Mode, I will provide realistic simulated bus schedules and pricing.\n\n"
+                "Where would you like to travel? Please share your departure city, destination, and travel date "
+                "(e.g., *'Chennai to Bangalore tomorrow'*)."
+            )
+
+    # Check if user message explicitly requests demo mode
+    if re.search(r"\bdemo\b", msg, re.IGNORECASE):
+        set_demo_mode(True)
+
     # 3. Process natural language query via GenAI Agent
     new_details, error = extract_travel_info(msg)
 
@@ -168,8 +235,28 @@ def get_bot_response(user_message: str) -> str:
     if _active_booking.status != "complete":
         return format_booking_summary(_active_booking)
 
-    # 7. Information is COMPLETE -> Execute RedBus Search & Filtering
+    # 7. Information is COMPLETE -> Execute Search (Demo or Live)
     summary_md = format_booking_summary(_active_booking)
+
+    if _demo_mode_active:
+        logger.info(
+            "Demo mode active: generating demonstration buses for %s -> %s on %s.",
+            _active_booking.source,
+            _active_booking.destination,
+            _active_booking.journey_date,
+        )
+        demo_result = get_demo_buses(
+            source=_active_booking.source,
+            destination=_active_booking.destination,
+            journey_date=_active_booking.journey_date,
+            details=_active_booking,
+        )
+        demo_md = format_demo_bus_results(demo_result)
+        safety_notice = (
+            "\n\n*🔒 RedBus AI Assistant operates in Demonstration & Planning mode. "
+            "Review options above and complete actual bookings directly on redBus.in.*"
+        )
+        return summary_md + demo_md + safety_notice
 
     logger.info(
         "Complete booking request detected: %s -> %s on %s. Executing browser search.",
@@ -190,10 +277,20 @@ def get_bot_response(user_message: str) -> str:
     # Format extracted bus listings
     bus_results_md = format_bus_results(search_result)
 
+    # If live search encountered an error, offer user an option to switch to demo mode
+    demo_fallback_offer = ""
+    if search_result.error_message:
+        demo_fallback_offer = (
+            "\n\n💡 **Demonstration Mode Available:**\n"
+            "Live RedBus search is currently restricted by website security protections. "
+            "Would you like to view realistic simulated bus options for this route? "
+            "Reply with **'show demo'** or **'demo mode'**."
+        )
+
     # Safety disclaimer (Search-only milestone)
     safety_notice = (
         "\n\n*🔒 RedBus AI Assistant operates in Search & Planning mode. "
         "Review bus options above and complete booking directly on redBus.in.*"
     )
 
-    return summary_md + bus_results_md + safety_notice
+    return summary_md + bus_results_md + demo_fallback_offer + safety_notice

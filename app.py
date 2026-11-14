@@ -225,6 +225,11 @@ def select_ac_sleeper(history):
     yield from bot_respond("AC Sleeper Buses", history)
 
 
+def select_demo_mode(history):
+    """Handler for '🎭 Demo Mode' quick suggestion."""
+    yield from bot_respond("show demo", history)
+
+
 def clear_conversation():
     """
     Reset the chatbot conversation to initial welcome state and clear input field.
@@ -287,6 +292,7 @@ def build_app():
                 btn_suggest_2 = gr.Button("Vijayawada to Hyderabad", elem_classes=["suggestion-btn"], size="sm")
                 btn_suggest_3 = gr.Button("Find buses under ₹1000", elem_classes=["suggestion-btn"], size="sm")
                 btn_suggest_4 = gr.Button("AC Sleeper Buses", elem_classes=["suggestion-btn"], size="sm")
+                btn_suggest_5 = gr.Button("🎭 Demo Mode", elem_classes=["suggestion-btn"], size="sm")
 
             # 4. User Input Row (Textbox + Send + Clear)
             with gr.Row():
@@ -352,6 +358,13 @@ def build_app():
 
         btn_suggest_4.click(
             fn=select_ac_sleeper,
+            inputs=[chatbot],
+            outputs=[user_msg_input, chatbot],
+            show_progress="minimal"
+        )
+
+        btn_suggest_5.click(
+            fn=select_demo_mode,
             inputs=[chatbot],
             outputs=[user_msg_input, chatbot],
             show_progress="minimal"
