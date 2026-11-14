@@ -254,7 +254,7 @@ def build_app():
                     <h1>🚌 RedBus AI Assistant</h1>
                     <p>Your Intelligent Bus Travel Companion</p>
                 </div>
-                <div class="header-badge">Module 1 • UI Ready</div>
+                <div class="header-badge">Module 2 • GenAI Active</div>
             </div>
             """
         )
@@ -300,7 +300,7 @@ def build_app():
                 clear_btn = gr.Button("Clear Chat 🗑️", variant="secondary", scale=1, elem_classes=["clear-btn"])
 
             # 5. Footer Info
-            gr.HTML('<div class="footer-text">RedBus AI Assistant • Module 1 (Gradio UI Frontend) • Powered by Python & Gradio</div>')
+            gr.HTML('<div class="footer-text">RedBus AI Assistant • Module 2 (Hugging Face GenAI Integration) • Powered by Python & Gradio</div>')
 
         # 6. Event Wiring
         # Send on button click or Enter key
