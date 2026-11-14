@@ -17,7 +17,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-from modules.chat_logic import get_bot_response, WELCOME_MESSAGE
+from modules.chat_logic import get_bot_response, WELCOME_MESSAGE, reset_conversation_state
 
 # Custom CSS for RedBus Travel Theme (Red, White, and Light Grey palette)
 CUSTOM_CSS = """
@@ -228,10 +228,12 @@ def select_ac_sleeper(history):
 def clear_conversation():
     """
     Reset the chatbot conversation to initial welcome state and clear input field.
+    Also resets active conversational booking state memory.
     
     Returns:
         tuple: ("", reset_history)
     """
+    reset_conversation_state()
     return "", create_initial_history()
 
 
